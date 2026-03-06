@@ -915,8 +915,8 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anyio" },
-    { name = "httpx" },
+    { name = "anyio", specifier = ">=4.12.1" },
+    { name = "httpx", specifier = ">=0.28.1" },
 ]
 
 [package.metadata.requires-dev]

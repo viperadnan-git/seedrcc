@@ -21,7 +21,10 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-dependencies = ["anyio", "httpx"]
+dependencies = [
+    "anyio>=4.12.1",
+    "httpx>=0.28.1",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/viperadnan-git/seedrcc-python-sdk"

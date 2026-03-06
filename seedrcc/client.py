@@ -836,6 +836,10 @@ class Seedr:
             raise AuthenticationError(
                 "This method requires OAuth authentication (from_password or from_device_code)."
             )
+
+        if not self._token.access_token:
+            self._refresh_access_token()
+
         url = kwargs.pop("url", _constants.RESOURCE_URL)
         params = kwargs.pop("params", {})
         if "access_token" not in params:
