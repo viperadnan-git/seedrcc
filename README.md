@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/hemantapkh/seedrcc/master/docs/images/seedrcc.png" width="250" alt="seedrcc logo">
+  <img src="https://raw.githubusercontent.com/viperadnan-git/seedrcc-python-sdk/master/docs/images/seedrcc.png" width="250" alt="seedrcc logo">
 </p>
 
 <h1 align="center">seedrcc</h1>
@@ -15,11 +15,11 @@
 <a href="https://pepy.tech/project/seedrcc">
 <img src='https://pepy.tech/badge/seedrcc'>
 </a>
-<a href="https://github.com/hemantapkh/seedrcc/stargazers">
-<img src="https://img.shields.io/github/stars/hemantapkh/seedrcc" alt="Stars"/>
+<a href="https://github.com/viperadnan-git/seedrcc-python-sdk/stargazers">
+<img src="https://img.shields.io/github/stars/viperadnan-git/seedrcc-python-sdk" alt="Stars"/>
 </a>
-<a href="https://github.com/hemantapkh/seedrcc/issues">
-<img src="https://img.shields.io/github/issues/hemantapkh/seedrcc" alt="Issues"/>
+<a href="https://github.com/viperadnan-git/seedrcc-python-sdk/issues">
+<img src="https://img.shields.io/github/issues/viperadnan-git/seedrcc-python-sdk" alt="Issues"/>
 </a>
 </p>
 
@@ -61,7 +61,7 @@ pip install seedrcc
 Or, install the latest version directly from GitHub:
 
 ```bash
-pip install git+https://github.com/hemantapkh/seedrcc.git
+pip install git+https://github.com/viperadnan-git/seedrcc-python-sdk.git
 ```
 
 ## 🚀 Usage
@@ -121,5 +121,5 @@ Contributions are welcome! If you'd like to help, please feel free to fork the r
 This project is distributed under the MIT License. See `LICENSE` for more information.
 
 ---
-Author/Maintainer: [Hemanta Pokharel](https://hemantapkh.com) ([GitHub](https://github.com/hemantapkh))
+Originally created by [Hemanta Pokharel](https://github.com/hemantapkh). Now maintained by [Adnan Ahmad](https://github.com/viperadnan-git).
 

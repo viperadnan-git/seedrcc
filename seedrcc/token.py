@@ -1,6 +1,6 @@
 import base64
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Optional
 
 from .exceptions import TokenError
@@ -12,15 +12,18 @@ class Token:
     Represents the authentication tokens for a Seedr session.
     """
 
-    access_token: str
+    access_token: Optional[str] = None
     refresh_token: Optional[str] = None
     device_code: Optional[str] = None
+    cookies: Optional[Dict[str, str]] = field(default=None, repr=False)  # [cookie-auth]
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Returns the token data as a dictionary, excluding any fields that are None.
         """
-        return asdict(self, dict_factory=lambda x: {k: v for (k, v) in x if v is not None})
+        return asdict(
+            self, dict_factory=lambda x: {k: v for (k, v) in x if v is not None}
+        )
 
     def to_json(self) -> str:
         """
@@ -59,6 +62,9 @@ class Token:
             f"access_token={_mask(self.access_token)}",
             f"refresh_token={_mask(self.refresh_token)}",
             f"device_code={_mask(self.device_code)}",
+            f"cookies=<{len(self.cookies)} cookies>"
+            if self.cookies
+            else "cookies=None",
         ]
         return f"Token({', '.join(parts)})"
 

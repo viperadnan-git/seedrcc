@@ -72,12 +72,15 @@ class Torrent(_BaseModel):
 
     @classmethod
     def from_dict(cls, data: dict) -> "Torrent":
+        warnings = data.get("warnings")
+        if isinstance(warnings, list):  # cookie API returns [] instead of None/str
+            warnings = warnings[0] if warnings else None
         instance = cls(
             id=data.get("id", 0),
             name=data.get("name", ""),
             size=data.get("size", 0),
             hash=data.get("hash", ""),
-            progress=data.get("progress", ""),
+            progress=str(data.get("progress", "")),  # cookie API returns int
             last_update=parse_datetime(data.get("last_update")),
             folder=data.get("folder", ""),
             download_rate=data.get("download_rate", 0),
@@ -88,7 +91,7 @@ class Torrent(_BaseModel):
             uploading_to=data.get("uploading_to", 0),
             seeders=data.get("seeders", 0),
             leechers=data.get("leechers", 0),
-            warnings=data.get("warnings"),
+            warnings=warnings,
             stopped=data.get("stopped", 0),
             progress_url=data.get("progress_url"),
         )
@@ -120,11 +123,14 @@ class File(_BaseModel):
             name=data.get("name", ""),
             size=data.get("size", 0),
             folder_id=data.get("folder_id", 0),
-            folder_file_id=data.get("folder_file_id", 0),
+            folder_file_id=data.get("folder_file_id")
+            or data.get("id", 0),  # cookie API uses 'id'
             hash=data.get("hash", ""),
             last_update=parse_datetime(data.get("last_update")),
-            play_audio=data.get("play_audio", False),
-            play_video=data.get("play_video", False),
+            play_audio=data.get("play_audio")
+            or data.get("is_audio", False),  # cookie API uses 'is_audio'
+            play_video=data.get("play_video")
+            or data.get("is_video", False),  # cookie API uses 'is_video'
             video_progress=data.get("video_progress"),
             is_lost=data.get("is_lost", 0),
             thumb=data.get("thumb"),
@@ -156,10 +162,12 @@ class Folder(_BaseModel):
     def from_dict(cls, data: dict) -> "Folder":
         instance = cls(
             id=data.get("id") or data.get("folder_id") or 0,
-            name=data.get("name", ""),
-            fullname=data.get("fullname", data.get("name", "")),
+            name=data.get("name") or data.get("path", ""),
+            fullname=data.get("fullname") or data.get("name") or data.get("path", ""),
             size=data.get("size", 0),
-            last_update=parse_datetime(data.get("last_update") or data.get("timestamp")),
+            last_update=parse_datetime(
+                data.get("last_update") or data.get("timestamp")
+            ),
             is_shared=data.get("is_shared", False),
             play_audio=data.get("play_audio", False),
             play_video=data.get("play_video", False),
@@ -378,7 +386,8 @@ class ScanPageResult(_BaseModel):
     @classmethod
     def from_dict(cls, data: dict) -> "ScanPageResult":
         instance = cls(
-            result=data.get("result", False), torrents=[ScannedTorrent.from_dict(t) for t in data.get("torrents", [])]
+            result=data.get("result", False),
+            torrents=[ScannedTorrent.from_dict(t) for t in data.get("torrents", [])],
         )
         object.__setattr__(instance, "_raw", data)
         return instance

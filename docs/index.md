@@ -15,11 +15,11 @@
 <a href="https://pepy.tech/project/seedrcc">
 <img src='https://pepy.tech/badge/seedrcc'>
 </a>
-<a href="https://github.com/hemantapkh/seedrcc/stargazers">
-<img src="https://img.shields.io/github/stars/hemantapkh/seedrcc" alt="Stars"/>
+<a href="https://github.com/viperadnan-git/seedrcc-python-sdk/stargazers">
+<img src="https://img.shields.io/github/stars/viperadnan-git/seedrcc-python-sdk" alt="Stars"/>
 </a>
-<a href="https://github.com/hemantapkh/seedrcc/issues">
-<img src="https://img.shields.io/github/issues/hemantapkh/seedrcc" alt="Issues"/>
+<a href="https://github.com/viperadnan-git/seedrcc-python-sdk/issues">
+<img src="https://img.shields.io/github/issues/viperadnan-git/seedrcc-python-sdk" alt="Issues"/>
 </a>
 </p>
 
@@ -48,7 +48,7 @@ pip install seedrcc
 Or, install the latest version directly from GitHub:
 
 ```bash
-pip install git+https://github.com/hemantapkh/seedrcc.git
+pip install git+https://github.com/viperadnan-git/seedrcc-python-sdk.git
 ```
 
 ## Basic Usage
@@ -215,4 +215,4 @@ Ready to explore the full API? The reference documentation provides a complete g
   - [Data Models](models.md)
   - [Exceptions](exceptions.md)
 - **License:** This project is licensed under the MIT License. See the `LICENSE` file for details.
-- **Contributing:** Contributions are welcome! Please see the project on [GitHub](https://github.com/hemantapkh/seedrcc).
+- **Contributing:** Contributions are welcome! Please see the project on [GitHub](https://github.com/viperadnan-git/seedrcc-python-sdk).

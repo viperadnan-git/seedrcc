@@ -13,6 +13,16 @@ class BaseModel:
         return asdict(self)
 
 
+# [cookie-auth]
+@dataclass
+class CookieLoginPayload(BaseModel):
+    """Payload for cookie-based authentication."""
+
+    username: str
+    password: str
+    rememberme: int = 1
+
+
 @dataclass
 class PasswordLoginPayload(BaseModel):
     """Payload for password-based authentication."""

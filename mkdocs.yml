@@ -1,6 +1,6 @@
 site_name: seedrcc
-repo_url: https://github.com/hemantapkh/seedrcc
-repo_name: hemantapkh/seedrcc
+repo_url: https://github.com/viperadnan-git/seedrcc-python-sdk
+repo_name: viperadnan-git/seedrcc-python-sdk
 
 theme:
   name: material

@@ -167,3 +167,8 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+# Manual test files
+test.py
+
+# Claude Code
+.claude/settings.local.json

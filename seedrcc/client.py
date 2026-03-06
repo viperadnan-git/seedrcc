@@ -1,15 +1,16 @@
+# This file is auto-generated from async_client.py — do not edit directly.
+# Regenerate with: python scripts/generate_sync.py
 import json
 from typing import Any, Callable, Dict, List, Literal, Optional, Type
 
 import httpx
 
 from . import _constants, _request_models, models
-from ._base import BaseClient
 from .exceptions import APIError, AuthenticationError, NetworkError, ServerError
 from .token import Token
 
 
-class Seedr(BaseClient):
+class Seedr:
     """Synchronous client for interacting with the Seedr API.
 
     Example:
@@ -37,6 +38,8 @@ class Seedr(BaseClient):
         httpx_client: Optional[httpx.Client] = None,
         timeout: float = 30.0,
         proxy: Optional[Dict[str, str]] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         **httpx_kwargs: Any,
     ) -> None:
         """Initializes the synchronous client with an existing token.
@@ -48,10 +51,15 @@ class Seedr(BaseClient):
             httpx_client: An optional, pre-configured `httpx.Client` instance.
             timeout: The timeout for network requests in seconds.
             proxy: An optional dictionary of proxy to use for requests.
+            username: The user's Seedr username (email), used for cookie session refresh.
+            password: The user's Seedr password, used for cookie session refresh.
             **httpx_kwargs: Optional keyword arguments to pass to the `httpx.Client` constructor.
                 These are ignored if `httpx_client` is provided.
         """
-        super().__init__(token, on_token_refresh)
+        self._token = token
+        self._on_token_refresh = on_token_refresh
+        self._username = username  # [cookie-auth]
+        self._password = password  # [cookie-auth]
         if httpx_client is not None:
             self._client = httpx_client
             self._manages_client_lifecycle = False
@@ -63,7 +71,8 @@ class Seedr(BaseClient):
 
     @property
     def token(self) -> Token:
-        return super().token
+        """Get the current authentication token used by the client."""
+        return self._token
 
     @staticmethod
     def get_device_code() -> models.DeviceCode:
@@ -85,7 +94,9 @@ class Seedr(BaseClient):
         """
         params = _request_models.GetDeviceCodeParams()
         with httpx.Client() as client:
-            response = Seedr._make_http_request(client, "get", _constants.DEVICE_CODE_URL, params=params.to_dict())
+            response = Seedr._make_http_request(
+                client, "get", _constants.DEVICE_CODE_URL, params=params.to_dict()
+            )
 
             if not response.is_success:
                 raise APIError("Failed to get device code.", response=response)
@@ -94,7 +105,7 @@ class Seedr(BaseClient):
                 response_data = response.json()
             except json.JSONDecodeError as e:
                 raise APIError("Invalid JSON response from API.", response=None) from e
-            return models.DeviceCode.from_dict(response_data)
+        return models.DeviceCode.from_dict(response_data)
 
     @classmethod
     def from_password(
@@ -132,7 +143,9 @@ class Seedr(BaseClient):
 
         def auth_callable(client: httpx.Client) -> Dict[str, Any]:
             """Prepare and execute the authentication request."""
-            payload = _request_models.PasswordLoginPayload(username=username, password=password)
+            payload = _request_models.PasswordLoginPayload(
+                username=username, password=password
+            )
             return cls._authenticate_and_get_token_data(
                 client,
                 "post",
@@ -149,6 +162,75 @@ class Seedr(BaseClient):
             proxy=proxy,
             **httpx_kwargs,
         )
+
+    # ── Cookie Authentication [cookie-auth] ─────────────────────────────────
+
+    @classmethod
+    def from_login(
+        cls: Type["Seedr"],
+        username: str,
+        password: str,
+        token: Optional[Token] = None,
+        on_token_refresh: Optional[Callable[[Token], None]] = None,
+        httpx_client: Optional[httpx.Client] = None,
+        timeout: float = 30.0,
+        proxy: Optional[Dict[str, str]] = None,
+        **httpx_kwargs: Any,
+    ) -> "Seedr":
+        """
+        Creates a new client by logging in with a username and password using cookie-based authentication.
+
+        Args:
+            username: The user's Seedr username (email).
+            password: The user's Seedr password.
+            token: An optional existing Token with OAuth credentials (access_token, refresh_token,
+                device_code). Cookies from the login will be merged into this token, enabling both
+                cookie and OAuth authentication on the same client.
+            on_token_refresh: A callback function that is called with the new
+                Token object when the session is refreshed.
+            httpx_client: An optional, pre-configured `httpx.Client` instance.
+            timeout: The timeout for network requests in seconds.
+            proxy: A dictionary of proxy to use for requests.
+            **httpx_kwargs: Optional keyword arguments to pass to the `httpx.Client` constructor.
+                These are ignored if `httpx_client` is provided.
+
+        Returns:
+            An initialized `Seedr` client instance using cookie-based authentication.
+
+        Example:
+            ```python
+            # Cookie-only auth
+            client = Seedr.from_login("email", "password")
+
+            # Combined cookie + OAuth auth
+            client = Seedr.from_login("email", "password", token=Token(access_token="..."))
+            ```
+        """
+        httpx_kwargs.setdefault("timeout", timeout)
+        httpx_kwargs.setdefault("proxy", proxy)
+        client = httpx_client or httpx.Client(**httpx_kwargs)
+        success = False
+        try:
+            # Skip login if token already has cookies [cookie-auth]
+            if token is not None and token.cookies:
+                cookie_token = token
+            else:
+                cookie_token = cls._cookie_login(
+                    client, username, password, token, on_token_refresh
+                )
+            instance = cls(
+                cookie_token,
+                on_token_refresh=on_token_refresh,
+                httpx_client=client,
+                username=username,
+                password=password,
+                **httpx_kwargs,
+            )
+            success = True
+            return instance
+        finally:
+            if httpx_client is None and not success:
+                client.close()
 
     @classmethod
     def from_device_code(
@@ -327,7 +409,14 @@ class Seedr(BaseClient):
             ```
         """
         payload = _request_models.ListContentsPayload(content_id=folder_id)
-        response_data = self._api_request("post", "list_contents", data=payload.to_dict())
+        # Prefer cookie auth for list_contents [cookie-auth]
+        if self._token.cookies is not None:
+            url = f"{_constants.COOKIE_BASE_URL}/fs/folder/{folder_id}/items"
+            response_data = self._cookie_api_request("get", url)
+        else:
+            response_data = self._api_request(
+                "post", "list_contents", data=payload.to_dict()
+            )
         return models.ListContentsResult.from_dict(response_data)
 
     def add_torrent(
@@ -360,16 +449,40 @@ class Seedr(BaseClient):
             print(result.title)
             ```
         """
-        payload = _request_models.AddTorrentPayload(
-            torrent_magnet=magnet_link,
-            wishlist_id=wishlist_id,
-            folder_id=folder_id,
-        )
-        files = {}
-        if torrent_file:
-            files = self._read_torrent_file(torrent_file)
-
-        response_data = self._api_request("post", "add_torrent", data=payload.to_dict(), files=files)
+        # Prefer cookie auth for add_torrent [cookie-auth]
+        if self._token.cookies is not None:
+            cookie_folder = "0" if folder_id == "-1" else folder_id
+            data: Dict[str, Any] = {
+                "type": "torrent",
+                "torrent_magnet": magnet_link,
+                "wishlist_id": wishlist_id,
+            }
+            files = None
+            if torrent_file:
+                if torrent_file.startswith(("http://", "https://")):
+                    data["torrent_url"] = torrent_file
+                else:
+                    files = self._read_torrent_file(torrent_file)
+            if files:
+                data["folder"] = cookie_folder
+            else:
+                data["folder_id"] = cookie_folder
+            url = f"{_constants.COOKIE_BASE_URL}/task"
+            response_data = self._cookie_api_request(
+                "post", url, data=data, files=files
+            )
+        else:
+            payload = _request_models.AddTorrentPayload(
+                torrent_magnet=magnet_link,
+                wishlist_id=wishlist_id,
+                folder_id=folder_id,
+            )
+            files = {}
+            if torrent_file:
+                files = self._read_torrent_file(torrent_file)
+            response_data = self._api_request(
+                "post", "add_torrent", data=payload.to_dict(), files=files
+            )
         return models.AddTorrentResult.from_dict(response_data)
 
     def scan_page(self, url: str) -> models.ScanPageResult:
@@ -430,7 +543,9 @@ class Seedr(BaseClient):
             ```
         """
         payload = _request_models.CreateArchivePayload(folder_id=folder_id)
-        response_data = self._api_request("post", "create_empty_archive", data=payload.to_dict())
+        response_data = self._api_request(
+            "post", "create_empty_archive", data=payload.to_dict()
+        )
         return models.CreateArchiveResult.from_dict(response_data)
 
     def search_files(self, query: str) -> models.Folder:
@@ -451,7 +566,9 @@ class Seedr(BaseClient):
             ```
         """
         payload = _request_models.SearchFilesPayload(search_query=query)
-        response_data = self._api_request("post", "search_files", data=payload.to_dict())
+        response_data = self._api_request(
+            "post", "search_files", data=payload.to_dict()
+        )
         return models.Folder.from_dict(response_data)
 
     def add_folder(self, name: str) -> models.APIResult:
@@ -493,7 +610,9 @@ class Seedr(BaseClient):
                 print("File renamed successfully.")
             ```
         """
-        payload = _request_models.RenameFilePayload(rename_to=rename_to, file_id=file_id)
+        payload = _request_models.RenameFilePayload(
+            rename_to=rename_to, file_id=file_id
+        )
         response_data = self._api_request("post", "rename", data=payload.to_dict())
         return models.APIResult.from_dict(response_data)
 
@@ -515,7 +634,9 @@ class Seedr(BaseClient):
                 print("Folder renamed successfully.")
             ```
         """
-        payload = _request_models.RenameFolderPayload(rename_to=rename_to, folder_id=folder_id)
+        payload = _request_models.RenameFolderPayload(
+            rename_to=rename_to, folder_id=folder_id
+        )
         response_data = self._api_request("post", "rename", data=payload.to_dict())
         return models.APIResult.from_dict(response_data)
 
@@ -589,7 +710,9 @@ class Seedr(BaseClient):
             ```
         """
         payload = _request_models.RemoveWishlistPayload(id=wishlist_id)
-        response_data = self._api_request("post", "remove_wishlist", data=payload.to_dict())
+        response_data = self._api_request(
+            "post", "remove_wishlist", data=payload.to_dict()
+        )
         return models.APIResult.from_dict(response_data)
 
     def get_devices(self) -> List[models.Device]:
@@ -634,7 +757,9 @@ class Seedr(BaseClient):
         try:
             data = response.json()
         except json.JSONDecodeError as e:
-            raise APIError("Invalid JSON response from progress URL.", response=response) from e
+            raise APIError(
+                "Invalid JSON response from progress URL.", response=response
+            ) from e
         return models.TorrentProgress.from_dict(data)
 
     def change_name(self, name: str, password: str) -> models.APIResult:
@@ -654,7 +779,9 @@ class Seedr(BaseClient):
             ```
         """
         payload = _request_models.ChangeNamePayload(fullname=name, password=password)
-        response_data = self._api_request("post", "user_account_modify", data=payload.to_dict())
+        response_data = self._api_request(
+            "post", "user_account_modify", data=payload.to_dict()
+        )
         return models.APIResult.from_dict(response_data)
 
     def change_password(self, old_password: str, new_password: str) -> models.APIResult:
@@ -678,13 +805,27 @@ class Seedr(BaseClient):
             new_password=new_password,
             new_password_repeat=new_password,
         )
-        response_data = self._api_request("post", "user_account_modify", data=payload.to_dict())
+        response_data = self._api_request(
+            "post", "user_account_modify", data=payload.to_dict()
+        )
         return models.APIResult.from_dict(response_data)
 
     def _api_request(
-        self, http_method: str, func: str, files: Optional[Dict[str, Any]] = None, **kwargs: Any
+        self,
+        http_method: str,
+        func: str,
+        files: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Handles the core logic for making authenticated API requests, including token refreshes."""
+        if not (
+            self._token.access_token
+            or self._token.refresh_token
+            or self._token.device_code
+        ):
+            raise AuthenticationError(
+                "This method requires OAuth authentication (from_password or from_device_code)."
+            )
         url = kwargs.pop("url", _constants.RESOURCE_URL)
         params = kwargs.pop("params", {})
         if "access_token" not in params:
@@ -692,7 +833,9 @@ class Seedr(BaseClient):
         if func:
             params["func"] = func
 
-        response = self._make_http_request(self._client, http_method, url, params=params, files=files, **kwargs)
+        response = self._make_http_request(
+            self._client, http_method, url, params=params, files=files, **kwargs
+        )
         try:
             data = response.json()
         except json.JSONDecodeError as e:
@@ -701,7 +844,9 @@ class Seedr(BaseClient):
         if isinstance(data, dict) and data.get("error") == "expired_token":
             self._refresh_access_token()
             params["access_token"] = self._token.access_token
-            response = self._make_http_request(self._client, http_method, url, params=params, files=files, **kwargs)
+            response = self._make_http_request(
+                self._client, http_method, url, params=params, files=files, **kwargs
+            )
             try:
                 data = response.json()
             except json.JSONDecodeError as e:
@@ -717,18 +862,134 @@ class Seedr(BaseClient):
 
         return data
 
+    # ── Cookie Authentication internals [cookie-auth] ───────────────────────
+
+    def _cookie_api_request(
+        self,
+        method: str,
+        url: str,
+        data: Optional[Dict[str, Any]] = None,
+        files: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Sends an authenticated request using cookies, with automatic session refresh on 401."""
+        headers = {"accept": "application/json"}
+        request_kwargs: Dict[str, Any] = {
+            "cookies": self._token.cookies,
+            "headers": headers,
+        }
+        if method != "get" and data is not None:
+            request_kwargs["data"] = {k: v for k, v in data.items() if v is not None}
+        if files:
+            request_kwargs["files"] = files
+
+        response = self._make_http_request(self._client, method, url, **request_kwargs)
+
+        if response.status_code == 401:
+            self._refresh_cookie_session()
+            request_kwargs["cookies"] = self._token.cookies
+            response = self._make_http_request(
+                self._client, method, url, **request_kwargs
+            )
+
+        try:
+            resp_data = response.json()
+        except json.JSONDecodeError as e:
+            raise APIError("Invalid JSON response from API.", response=response) from e
+
+        if response.is_client_error:
+            raise APIError("API request failed.", response=response)
+
+        # Normalize 'success' → 'result' for cookie API responses
+        if (
+            isinstance(resp_data, dict)
+            and "success" in resp_data
+            and "result" not in resp_data
+        ):
+            resp_data["result"] = resp_data.pop("success")
+
+        if isinstance(resp_data, dict) and resp_data.get("result", True) is not True:
+            raise APIError("API operation failed.", response=response)
+
+        return resp_data
+
+    @staticmethod
+    def _cookie_login(
+        client: httpx.Client,
+        username: str,
+        password: str,
+        token: Optional[Token] = None,
+        on_token_refresh: Optional[Callable[[Token], None]] = None,
+    ) -> Token:
+        """Performs cookie-based login, merges with existing token if provided, and fires the callback."""
+        payload = _request_models.CookieLoginPayload(
+            username=username, password=password
+        )
+        response = Seedr._make_http_request(
+            client, "post", _constants.COOKIE_LOGIN_URL, json=payload.to_dict()
+        )
+
+        if not response.is_success:
+            raise AuthenticationError(
+                "Cookie authentication failed.", response=response
+            )
+
+        cookies = {c.name: c.value for c in response.cookies.jar}
+        if not cookies:
+            raise AuthenticationError(
+                "No cookies received from login response.", response=response
+            )
+
+        if token is not None:
+            new_token = Token(
+                access_token=token.access_token,
+                refresh_token=token.refresh_token,
+                device_code=token.device_code,
+                cookies=cookies,
+            )
+        else:
+            new_token = Token(cookies=cookies)
+        if on_token_refresh:
+            on_token_refresh(new_token)
+        return new_token
+
+    def _refresh_cookie_session(self) -> None:
+        """Re-authenticates using stored credentials to get fresh cookies."""
+        if not self._username or not self._password:
+            raise AuthenticationError(
+                "No credentials available to refresh cookie session."
+            )
+
+        self._token = self._cookie_login(
+            self._client,
+            self._username,
+            self._password,
+            self._token,
+            self._on_token_refresh,
+        )
+
     def _refresh_access_token(self) -> models.RefreshTokenResult:
         """Refreshes the access token using the refresh token or device code."""
         if self._token.refresh_token:
-            payload = _request_models.RefreshTokenPayload(refresh_token=self._token.refresh_token)
-            response = self._make_http_request(self._client, "post", _constants.TOKEN_URL, data=payload.to_dict())
-        elif self._token.device_code:
-            params = _request_models.DeviceCodeAuthParams(device_code=self._token.device_code)
+            payload = _request_models.RefreshTokenPayload(
+                refresh_token=self._token.refresh_token
+            )
             response = self._make_http_request(
-                self._client, "get", _constants.DEVICE_AUTHORIZE_URL, params=params.to_dict()
+                self._client, "post", _constants.TOKEN_URL, data=payload.to_dict()
+            )
+        elif self._token.device_code:
+            params = _request_models.DeviceCodeAuthParams(
+                device_code=self._token.device_code
+            )
+            response = self._make_http_request(
+                self._client,
+                "get",
+                _constants.DEVICE_AUTHORIZE_URL,
+                params=params.to_dict(),
             )
         else:
-            raise AuthenticationError("No refresh token or device code available to refresh the session.")
+            raise AuthenticationError(
+                "No refresh token or device code available to refresh the session."
+            )
 
         if not response.is_success:
             raise AuthenticationError("Failed to refresh token.", response=response)
@@ -763,9 +1024,13 @@ class Seedr(BaseClient):
             with open(torrent_file, "rb") as f:
                 return {"torrent_file": f.read()}
 
-    def _delete_api_item(self, item_type: Literal["file", "folder", "torrent"], item_id: str) -> models.APIResult:
+    def _delete_api_item(
+        self, item_type: Literal["file", "folder", "torrent"], item_id: str
+    ) -> models.APIResult:
         """Constructs and sends a request to delete a specific item (file, folder, etc.)."""
-        payload = _request_models.DeleteItemPayload(item_type=item_type, item_id=item_id)
+        payload = _request_models.DeleteItemPayload(
+            item_type=item_type, item_id=item_id
+        )
         response_data = self._api_request("post", "delete", data=payload.to_dict())
         return models.APIResult.from_dict(response_data)
 
@@ -793,7 +1058,12 @@ class Seedr(BaseClient):
                 refresh_token=response_data.get("refresh_token"),
                 **token_extras,
             )
-            instance = cls(token, on_token_refresh=on_token_refresh, httpx_client=client, **httpx_kwargs)
+            instance = cls(
+                token,
+                on_token_refresh=on_token_refresh,
+                httpx_client=client,
+                **httpx_kwargs,
+            )
             success = True
             return instance
         finally:
@@ -816,7 +1086,9 @@ class Seedr(BaseClient):
 
         try:
             data = response.json()
-            if isinstance(data, dict) and data.get("error") in ["authorization_pending"]:
+            if isinstance(data, dict) and data.get("error") in [
+                "authorization_pending"
+            ]:
                 raise AuthenticationError(
                     "Authentication failed.",
                     response=response,

@@ -1,7 +1,7 @@
 [project]
 name = "seedrcc"
-version = "2.0.3"
-authors = [{ name = "Hemanta Pokharel", email = "yo@hemantapkh.com" }]
+dynamic = ["version"]
+authors = [{ name = "Adnan Ahmad", email = "viperadnan@gmail.com" }]
 description = "A comprehensive Python API wrapper for seedr.cc"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -24,18 +24,29 @@ classifiers = [
 dependencies = ["anyio", "httpx"]
 
 [project.urls]
-"Homepage" = "https://github.com/hemantapkh/seedrcc"
+"Homepage" = "https://github.com/viperadnan-git/seedrcc-python-sdk"
 "Documentation" = "https://seedrcc.readthedocs.io/en/latest/"
-"Bug Tracker" = "https://github.com/hemantapkh/seedrcc/issues"
+"Bug Tracker" = "https://github.com/viperadnan-git/seedrcc-python-sdk/issues"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
-[tool.ruff]
-line-length = 120
+[tool.hatch.version]
+source = "vcs"
+
+[tool.nizm.hooks]
+generate-sync = { cmd = "uv run python scripts/generate_sync.py", glob = "seedrcc/async_client.py" }
+ruff = { cmd = "uvx ruff check --fix {staged_files} && uvx ruff format {staged_files}", glob = "*.py" }
+
+[tool.ruff.lint]
+select = ["F", "I"]
+fixable = ["F401", "I"]
 
 [dependency-groups]
+dev = [
+    "ruff>=0.15.5",
+]
 docs = [
   "griffe-fieldz>=0.3.0",
   "mkdocs>=1.6.1",
