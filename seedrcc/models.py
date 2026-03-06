@@ -55,7 +55,7 @@ class Torrent(_BaseModel):
     name: str
     size: int
     hash: str
-    progress: str
+    progress: float
     last_update: Optional[datetime]
     folder: str = ""
     download_rate: int = 0
@@ -80,7 +80,7 @@ class Torrent(_BaseModel):
             name=data.get("name", ""),
             size=data.get("size", 0),
             hash=data.get("hash", ""),
-            progress=str(data.get("progress", "")),  # cookie API returns int
+            progress=float(data.get("progress", 0)),
             last_update=parse_datetime(data.get("last_update")),
             folder=data.get("folder", ""),
             download_rate=data.get("download_rate", 0),

@@ -431,6 +431,7 @@ class AsyncSeedr:
         torrent_file: Optional[str] = None,
         wishlist_id: Optional[str] = None,
         folder_id: str = "-1",
+        force_upload: bool = False,
     ) -> models.AddTorrentResult:
         """
         Add a torrent to the seedr account for downloading.
@@ -440,6 +441,9 @@ class AsyncSeedr:
             torrent_file (str, optional): Remote or local path of the torrent file.
             wishlist_id (str, optional): The ID of a wishlist item to add.
             folder_id (str, optional): The folder ID to add the torrent to. Defaults to root ('-1').
+            force_upload (bool, optional): When True, downloads the torrent file from the URL
+                and uploads it directly instead of passing the URL to the API. Useful for
+                URLs that the server cannot fetch (e.g. Cloudflare-protected). Defaults to False.
 
         Returns:
             An object containing the result of the add torrent operation.
@@ -453,19 +457,24 @@ class AsyncSeedr:
             # Add from a local .torrent file
             result = await client.add_torrent(torrent_file="/path/to/your/file.torrent")
             print(result.title)
+
+            # Force download and upload for protected URLs
+            result = await client.add_torrent(torrent_file="https://...", force_upload=True)
             ```
         """
         # Prefer cookie auth for add_torrent [cookie-auth]
         if self._token.cookies is not None:
             cookie_folder = "0" if folder_id == "-1" else folder_id
-            data: Dict[str, Any] = {
-                "type": "torrent",
-                "torrent_magnet": magnet_link,
-                "wishlist_id": wishlist_id,
-            }
+            data: Dict[str, Any] = {"type": "torrent"}
             files = None
-            if torrent_file:
-                if torrent_file.startswith(("http://", "https://")):
+            if magnet_link:
+                data["torrent_magnet"] = magnet_link
+            elif wishlist_id:
+                data["wishlist_id"] = wishlist_id
+            elif torrent_file:
+                if not force_upload and torrent_file.startswith(
+                    ("http://", "https://")
+                ):
                     data["torrent_url"] = torrent_file
                 else:
                     files = await self._read_torrent_file_async(torrent_file)
