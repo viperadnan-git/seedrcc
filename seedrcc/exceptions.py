@@ -19,7 +19,9 @@ class APIError(SeedrError):
     """
 
     def __init__(
-        self, default_message: str = "An API error occurred.", response: Optional[httpx.Response] = None
+        self,
+        default_message: str = "An API error occurred.",
+        response: Optional[httpx.Response] = None,
     ) -> None:
         self.response = response
         self.code: Optional[int] = None
@@ -28,11 +30,14 @@ class APIError(SeedrError):
         if response:
             try:
                 data = response.json()
-                if isinstance(data, dict):
-                    self.code = data.get("code")
-                    self.error_type = data.get("result")
-                    default_message = data.get("error") or default_message
-
+                self.code = data.get("code")
+                self.error_type = data.get("result") or data.get("reason_phrase")
+                if data.get("error"):
+                    default_message = data.get("error")
+                elif self.error_type:
+                    default_message = f"Reason: {self.error_type}"
+                else:
+                    default_message = f"{response.status_code} {response.reason_phrase}"
             except json.JSONDecodeError:
                 pass
 
@@ -43,7 +48,9 @@ class ServerError(SeedrError):
     """Raised for 5xx server-side errors."""
 
     def __init__(
-        self, default_message: str = "A server error occurred.", response: Optional[httpx.Response] = None
+        self,
+        default_message: str = "A server error occurred.",
+        response: Optional[httpx.Response] = None,
     ) -> None:
         self.response = response
         if response:
@@ -63,7 +70,9 @@ class AuthenticationError(SeedrError):
     """
 
     def __init__(
-        self, default_message: str = "An authentication error occurred.", response: Optional[httpx.Response] = None
+        self,
+        default_message: str = "An authentication error occurred.",
+        response: Optional[httpx.Response] = None,
     ) -> None:
         self.response = response
         self.error_type: Optional[str] = None
