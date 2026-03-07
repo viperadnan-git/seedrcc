@@ -15,7 +15,9 @@ class Token:
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
     device_code: Optional[str] = None
-    cookies: Optional[Dict[str, str]] = field(default=None, repr=False)  # [cookie-auth]
+    cookies: Optional[Dict[str, str | None]] = field(
+        default=None, repr=False
+    )  # [cookie-auth]
 
     def to_dict(self) -> Dict[str, Any]:
         """

@@ -1,6 +1,7 @@
 # This file is auto-generated from async_client.py — do not edit directly.
 # Regenerate with: python scripts/generate_sync.py
 import json
+from dataclasses import replace
 from typing import Any, Callable, Dict, List, Literal, Optional, Type
 
 import httpx
@@ -952,12 +953,7 @@ class Seedr:
             )
 
         if token is not None:
-            new_token = Token(
-                access_token=token.access_token,
-                refresh_token=token.refresh_token,
-                device_code=token.device_code,
-                cookies=cookies,
-            )
+            new_token = replace(token, cookies=cookies)
         else:
             new_token = Token(cookies=cookies)
         if on_token_refresh:
@@ -1016,11 +1012,7 @@ class Seedr:
                 response=response,
             )
 
-        self._token = Token(
-            access_token=response_data["access_token"],
-            refresh_token=self._token.refresh_token,
-            device_code=self._token.device_code,
-        )
+        self._token = replace(self._token, access_token=response_data["access_token"])
         if self._on_token_refresh:
             self._on_token_refresh(self._token)
 
